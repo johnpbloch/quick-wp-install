@@ -99,6 +99,9 @@ quick-wp [options]
           signs (###) will be replaced by the site's id number.
           The default slug is 'qt###'.
 
+--list    List all sites set up with this program. This will 
+    -l    show locations, urls, ids and states for all sites.
+
 EOF;
 		exit(0);
 	}

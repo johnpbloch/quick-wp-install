@@ -41,6 +41,9 @@ The installation program also has a few command line arguments:
               (http://localhost/<slug>). A sequence of three pound
               signs (###) will be replaced by the site's id number.
               The default slug is 'qt###'.
+    
+    --list    List all sites set up with this program. This will
+     -l       show locations, urls, ids and states for all sites.
 
 To remove a WordPress installation, use the command
 
