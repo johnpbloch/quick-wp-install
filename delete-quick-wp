@@ -1,0 +1,78 @@
+#!/usr/bin/php
+<?php
+
+$is_wpcli_installed = exec( 'which wp' );
+
+if( !$is_wpcli_installed )
+{
+	echo <<<EOF
+WP-CLI is not installed. This must be installed before you can use this program. See https://github.com/wp-cli/wp-cli#readme for more details.
+Terminating...
+
+EOF;
+	exit(1);
+}
+
+array_shift( $argv );
+
+if( empty( $argv ) )
+{
+	echo <<<EOF
+No quicktest site specified for deletion! Please tell me which site you want to delete!
+
+EOF;
+	exit(1);
+}
+
+if( $argv[0] == '--all' )
+{
+	$where = '';
+}
+else
+{
+	$where = ' WHERE id IN(';
+	foreach( $argv as $site_ID )
+	{
+		if( !abs( (int)$site_ID ) )
+			continue;
+		$where .= abs((int)$site_ID) . ',';
+	}
+	$where = rtrim( $where, ',' ) . ')';
+}
+
+$mysql = mysql_connect( 'localhost', 'test', 'test' );
+mysql_select_db( 'test', $mysql );
+
+$query = "SELECT id,path,status FROM `quicktestSites`$where ORDER BY id ASC;";
+$sites_to_delete = mysql_query( $query );
+
+if( !mysql_num_rows( $sites_to_delete ) )
+{
+	echo <<<EOF
+There were no sites that matched your parameters.
+
+EOF;
+	exit(0);
+}
+
+while( $site = mysql_fetch_object( $sites_to_delete ) )
+{
+	if( is_dir( $site->path ) )
+	{
+		exec( "rm -r $site->path" );
+	}
+	$query = "SHOW TABLES LIKE 'qt{$site->id}_%';";
+	$old_tables = mysql_query( $query, $mysql );
+	if( mysql_num_rows( $old_tables ) !== 0 )
+	{
+		$query = "DROP TABLE";
+		while( $table = mysql_fetch_array( $old_tables, MYSQL_NUM ) )
+		{
+			$query .= " `{$table[0]}`,";
+		}
+		$query = substr( $query, 0, -1 ) . ';';
+		mysql_query( $query, $mysql );
+	}
+	mysql_query( "UPDATE `quicktestSites` SET status = 'pending' WHERE id = $site->id;", $mysql );
+}
+

@@ -1,0 +1,254 @@
+#!/usr/bin/php
+<?php
+
+$is_wpcli_installed = exec( 'which wp' );
+
+if( !$is_wpcli_installed )
+{
+	echo <<<EOF
+WP-CLI is not installed. This must be installed before you can use this program. See https://github.com/wp-cli/wp-cli#readme for more details.
+Terminating...
+
+EOF;
+	exit(1);
+}
+
+$arguments = array(
+	'url' => 'http://localhost/##QT##',
+	'path' => '~/Sites/##QT##',
+	'name' => '##QTNAME##',
+	'slug' => 'qt###',
+);
+
+$specified_args = array();
+
+if( $argc > 1 )
+{
+	array_shift( $argv );
+	$help = false;
+	while( $argv )
+	{
+		$current_variable = array_shift( $argv );
+		if( $current_variable === '=' )
+		{
+			$current_variable = array_shift( $argv );
+		}
+		if( !$current_variable )
+		{
+			continue;
+		}
+		if( preg_match( '@^--?h(elp)?$@', $current_variable ) )
+		{
+			$help = true;
+			break;
+		}
+		if( !preg_match( '@^--?([^=]+)(=.+)?$@', $current_variable, $matches ) )
+		{
+			continue;
+		}
+		$variable_name = $matches[1];
+		if( !isset( $arguments[$variable_name] ) )
+		{
+			continue;
+		}
+		if( !empty( $matches[2] ) )
+		{
+			$value = substr( $matches[2], 1 );
+			$value = trim( $value, '\'" ' );
+		}
+		else
+		{
+			$value = array_shift( $argv );
+			if( $value === '=' )
+			{
+				$value = array_shift( $argv );
+			}
+		}
+		if( trim( $value ) )
+		{
+			$arguments[$variable_name] = $specified_args[$variable_name] = trim( $value );
+		}
+	}
+	if( $help )
+	{
+		echo <<<EOF
+
+This is some help text. Do things here.
+
+EOF;
+		exit(0);
+	}
+	unset( $variable_name, $value, $current_variable, $matches );
+}
+
+$mysql = mysql_connect( 'localhost', 'test', 'test' );
+mysql_select_db( 'test', $mysql );
+
+$query = "SELECT * FROM `quicktestSites` WHERE status = 'pending' ORDER BY id ASC LIMIT 1;";
+$pending_site = mysql_query( $query );
+
+if( mysql_num_rows( $pending_site ) === 1 )
+{
+	$site = mysql_fetch_assoc( $pending_site );
+	extract( $site );
+	$quicktestID = $id;
+	if( !empty( $specified_args ) )
+		extract( $specified_args );
+}
+else
+{
+	$query = "INSERT INTO `quicktestSites` (status) VALUES('pending');";
+	$worked = mysql_query( $query, $mysql );
+
+	if( !$worked )
+	{
+		echo "Something went wrong...\nAborting...\n";
+		exit(1);
+	}
+
+	$quicktestID = mysql_insert_id( $mysql );
+	$quicktestSlug = str_replace( '###', $quicktestID, $arguments['slug'] );
+	$quicktestName = "Quick Test $quicktestID";
+	foreach( $arguments as &$argument )
+	{
+		$argument = str_replace( array( '##QT##', '##QTNAME##' ), array( $quicktestSlug, $quicktestName ), $argument );
+		$argument = mysql_real_escape_string( $argument, $mysql );
+	}
+	unset( $argument );
+
+	extract( $arguments );
+
+	if( 0 !== strpos( $path, '/' ) )
+	{
+		if( 0 === strpos( $path, '~' ) )
+		{
+			$home = exec( 'echo $HOME' );
+			$path = $home . substr( $path, 1 );
+		}
+		else
+		{
+			$path = getcwd() . "/$path";
+		}
+	}
+
+	$query = "UPDATE `quicktestSites` SET url='$url', path='$path', name='$name' WHERE id = $quicktestID;";
+	mysql_query( $query, $mysql );
+}
+
+if( !is_dir( $path ) )
+{
+	echo <<<EOF
+Creating directory... 
+EOF;
+	umask( 0022 );
+	$ok = mkdir( $path, 0777, true );
+	if( !$ok )
+	{
+		echo <<<EOF
+
+Could not create directory '$path'. Try running the following command before trying again:
+
+    mkdir -p $path
+
+Terminating...
+
+EOF;
+		exit(1);
+	}
+	echo "ok.\n";
+}
+
+chdir( $path );
+
+if( !is_dir( 'wp-admin' ) )
+{
+	echo <<<EOF
+Downloading WordPress... 
+EOF;
+	exec( 'wp core download --silent' );
+	if( !is_dir( 'wp-admin' ) )
+	{
+		echo <<<EOF
+
+Download failed. Error message:
+
+	$downloaded
+
+EOF;
+		exit(1);
+	}
+	echo "ok.\n";
+}
+
+if( is_file( 'wp-config.php' ) )
+{
+	@unlink( 'wp-config.php' );
+}
+
+echo <<<EOF
+Configuring WordPress... 
+EOF;
+
+$command = "wp core config --name=\"test\" --user=\"test\" --pass=\"test\" --prefix=\"qt{$quicktestID}_\"";
+exec( $command, $output );
+$output = implode( "\n", $output );
+
+$success = strpos( $output, 'WordPress can now communicate with your database' );
+
+if( $success === false )
+{
+	echo <<<EOF
+
+Configuration failed.
+Terminating.
+
+EOF;
+	exit(1);
+}
+
+echo "ok.\n";
+
+$query = "SHOW TABLES LIKE 'qt{$quicktestID}_%';";
+$old_tables = mysql_query( $query, $mysql );
+if( mysql_num_rows( $old_tables ) !== 0 )
+{
+	$query = "DROP TABLE";
+	while( $table = mysql_fetch_array( $old_tables, MYSQL_NUM ) )
+	{
+		$query .= " `{$table[0]}`,";
+	}
+	$query = substr( $query, 0, -1 ) . ';';
+	mysql_query( $query, $mysql );
+}
+
+echo <<<EOF
+Installing WordPress... 
+EOF;
+
+$command = "wp core install --site_url=\"$url\" --site_title=\"$name\" --admin_email=\"test@example.com\" --admin_password=\"asdf\"";
+$success = exec( $command );
+if( false === strpos( $success, 'WordPress installed successfully' ) )
+{
+	echo <<<EOF
+
+Installation failed. Error message:
+
+	$success
+
+EOF;
+	exit(1);
+}
+echo "ok.\n";
+
+$query = "UPDATE `quicktestSites` SET status = 'installed' WHERE id = $quicktestID;";
+$worked = mysql_query( $query, $mysql );
+
+echo <<<EOF
+WordPress was successfully set up! Accessing it in your browser at $url now...
+
+EOF;
+
+exec( "open $url" );
+
+exit(0);
+
