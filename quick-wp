@@ -25,7 +25,7 @@ $specified_args = array();
 if( $argc > 1 )
 {
 	array_shift( $argv );
-	$help = false;
+	$list = $help = false;
 	while( $argv )
 	{
 		$current_variable = array_shift( $argv );
@@ -40,6 +40,11 @@ if( $argc > 1 )
 		if( preg_match( '@^--?h(elp)?$@', $current_variable ) )
 		{
 			$help = true;
+			break;
+		}
+		elseif( preg_match( '@^--?l(ist)?$@', $current_variable ) )
+		{
+			$list = true;
 			break;
 		}
 		if( !preg_match( '@^--?([^=]+)(=.+)?$@', $current_variable, $matches ) )
@@ -137,6 +142,52 @@ if( mysql_num_rows( $tables ) === 0 )
 		PRIMARY KEY (`id`)
 	) ENGINE=MyISAM DEFAULT CHARSET=utf8";
 	mysql_query( $create, $mysql );
+}
+
+if( $list )
+{
+	$raw_sites = mysql_query( "SELECT * FROM `quicktestSites`;", $mysql );
+	$sites = $columns = array();
+	if( mysql_num_rows( $raw_sites ) === 0 )
+	{
+		echo <<<EOF
+There are no sites!
+
+EOF;
+	}
+	else
+	{
+		while( $site = mysql_fetch_object( $raw_sites ) )
+		{
+			$sites[] = $site;
+			$fields = get_object_vars( $site );
+			foreach( $fields as $field => $val )
+			{
+				if( empty( $columns[$field] ) )
+					$columns[$field] = 1;
+				$columns[$field] = max( $columns[$field], strlen( (string)$val ) );
+			}
+			foreach( array_keys( $columns ) as $col )
+				$columns[$col] = max( $columns[$col], strlen( $col ) );
+		}
+		$width = array_sum( $columns ) + 1 + ( 3 * count( $columns ) );
+		echo str_repeat( '_', $width );
+		echo "\n";
+		$line_format = '|';
+		foreach( $columns as $col )
+			$line_format .= ' %-' . $col . 's |';
+		echo call_user_func_array('sprintf', array_merge( array( $line_format ), array_keys( $columns ) ) ) . "\n";
+		echo str_repeat( '—', $width ) . "\n";
+		$line_format = '|';
+		foreach( $columns as $col => $col_width )
+			$line_format .= ' %-' . $col_width . ($col == 'id' ? 'd' : 's') . ' |';
+		foreach( $sites as $site )
+		{
+			echo call_user_func_array( 'sprintf', array_merge( array( $line_format ), array_values( get_object_vars( $site ) ) ) ) . "\n";
+		}
+		echo str_repeat( '—', $width ) . "\n";
+	}
+	exit(0);
 }
 
 $query = "SELECT * FROM `quicktestSites` WHERE status = 'pending' ORDER BY id ASC LIMIT 1;";
