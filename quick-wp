@@ -72,8 +72,26 @@ if( $argc > 1 )
 	if( $help )
 	{
 		echo <<<EOF
+quick-wp [options]
 
-This is some help text. Do things here.
+--help    This help menu
+    -h
+
+--path    The filesystem path in which to install WordPress
+          Paths do not need to be absolute, and also supports
+          a tilde (~) to signify the current user's home.
+
+--url     The url from which this WordPress installation will
+          be accessible.
+
+--name    The site name of the new site.
+
+--slug    May be used to customize both path and url partially.
+          If provided, the slug will be used to name the folder
+          used (~/Sites/<slug>) as well as the URL
+          (http://localhost/<slug>). A sequence of three pound
+          signs (###) will be replaced by the site's id number.
+          The default slug is 'qt###'.
 
 EOF;
 		exit(0);
