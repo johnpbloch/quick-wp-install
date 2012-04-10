@@ -29,9 +29,12 @@ The installation program also has a few command line arguments:
     --path    The filesystem path in which to install WordPress
               Paths do not need to be absolute, and also supports
               a tilde (~) to signify the current user's home.
+    
     --url     The url from which this WordPress installation will
               be accessible.
+    
     --name    The site name of the new site.
+    
     --slug    May be used to customize both path and url partially.
               If provided, the slug will be used to name the folder
               used (~/Sites/<slug>) as well as the URL
