@@ -82,10 +82,46 @@ EOF;
 }
 
 $mysql = mysql_connect( 'localhost', 'test', 'test' );
-mysql_select_db( 'test', $mysql );
+
+if( !$mysql )
+{
+	echo <<<EOF
+Could not connect to database server!
+Terminating...
+
+EOF;
+	exit(1);
+}
+
+$database_exists = mysql_select_db( 'test', $mysql );
+
+if( !$database_exists )
+{
+	echo <<<EOF
+Could not select database!
+Terminating...
+
+EOF;
+	exit(1);
+}
+
+$tables = mysql_query( "SHOW TABLES LIKE 'quicktestSites';", $mysql );
+
+if( mysql_num_rows( $tables ) === 0 )
+{
+	$create = "CREATE TABLE `quicktestSites` (
+		`id` bigint(10) unsigned NOT NULL AUTO_INCREMENT,
+		`url` varchar(100) NOT NULL DEFAULT '',
+		`path` varchar(100) NOT NULL DEFAULT '',
+		`name` varchar(100) NOT NULL DEFAULT '',
+		`status` varchar(40) NOT NULL DEFAULT '',
+		PRIMARY KEY (`id`)
+	) ENGINE=MyISAM DEFAULT CHARSET=utf8";
+	mysql_query( $create, $mysql );
+}
 
 $query = "SELECT * FROM `quicktestSites` WHERE status = 'pending' ORDER BY id ASC LIMIT 1;";
-$pending_site = mysql_query( $query );
+$pending_site = mysql_query( $query, $mysql );
 
 if( mysql_num_rows( $pending_site ) === 1 )
 {
