@@ -72,6 +72,7 @@ if( $argc > 1 )
 	if( $help )
 	{
 		echo <<<EOF
+
 quick-wp [options]
 
 --help    This help menu
