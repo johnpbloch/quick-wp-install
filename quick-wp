@@ -22,10 +22,11 @@ $arguments = array(
 
 $specified_args = array();
 
+$list = $help = false;
+
 if( $argc > 1 )
 {
 	array_shift( $argv );
-	$list = $help = false;
 	while( $argv )
 	{
 		$current_variable = array_shift( $argv );
@@ -199,10 +200,11 @@ $pending_site = mysql_query( $query, $mysql );
 if( mysql_num_rows( $pending_site ) === 1 )
 {
 	$site = mysql_fetch_assoc( $pending_site );
-	extract( $site );
-	$quicktestID = $id;
+	$quicktestID = $site['id'];
 	if( !empty( $specified_args ) )
-		extract( $specified_args );
+    {
+        $arguments = array_merge( $arguments, $specified_args );
+    }
 }
 else
 {
@@ -216,33 +218,33 @@ else
 	}
 
 	$quicktestID = mysql_insert_id( $mysql );
-	$quicktestSlug = str_replace( '###', $quicktestID, $arguments['slug'] );
-	$quicktestName = "Quick Test $quicktestID";
-	foreach( $arguments as &$argument )
-	{
-		$argument = str_replace( array( '##QT##', '##QTNAME##' ), array( $quicktestSlug, $quicktestName ), $argument );
-		$argument = mysql_real_escape_string( $argument, $mysql );
-	}
-	unset( $argument );
-
-	extract( $arguments );
-
-	if( 0 !== strpos( $path, '/' ) )
-	{
-		if( 0 === strpos( $path, '~' ) )
-		{
-			$home = exec( 'echo $HOME' );
-			$path = $home . substr( $path, 1 );
-		}
-		else
-		{
-			$path = getcwd() . "/$path";
-		}
-	}
-
-	$query = "UPDATE `quicktestSites` SET url='$url', path='$path', name='$name' WHERE id = $quicktestID;";
-	mysql_query( $query, $mysql );
 }
+$quicktestSlug = str_replace( '###', $quicktestID, $arguments['slug'] );
+$quicktestName = "Quick Test $quicktestID";
+foreach( $arguments as &$argument )
+{
+    $argument = str_replace( array( '##QT##', '##QTNAME##' ), array( $quicktestSlug, $quicktestName ), $argument );
+    $argument = mysql_real_escape_string( $argument, $mysql );
+}
+unset( $argument );
+
+extract( $arguments );
+
+if( 0 !== strpos( $path, '/' ) )
+{
+    if( 0 === strpos( $path, '~' ) )
+    {
+        $home = exec( 'echo $HOME' );
+        $path = $home . substr( $path, 1 );
+    }
+    else
+    {
+        $path = getcwd() . "/$path";
+    }
+}
+
+$query = "UPDATE `quicktestSites` SET url='$url', path='$path', name='$name' WHERE id = $quicktestID;";
+mysql_query( $query, $mysql );
 
 if( !is_dir( $path ) )
 {
